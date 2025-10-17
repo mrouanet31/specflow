@@ -41,10 +41,23 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - name: Build backend (Spring Boot)
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/gradle/wrapper/gradle-wrapper.properties') }}
+
+      - name: Build backend (Spring Boot with Gradle)
         run: |
           cd backend || exit 0
-          if [ -f pom.xml ]; then mvn -q -f pom.xml -DskipTests package; fi
+          if [ -f gradlew ]; then
+            ./gradlew clean build --no-daemon
+          else
+            echo "No gradle wrapper found, attempting gradle build"
+            gradle clean build
+          fi
 
   python-tests:
     runs-on: ubuntu-latest
