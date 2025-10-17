@@ -14,4 +14,13 @@ python -m pip install --user pre-commit
 echo "Installing pre-commit hooks..."
 ~/.local/bin/pre-commit install || pre-commit install
 
+echo "Installing commitlint (local dev)..."
+if command -v npm >/dev/null 2>&1; then
+  npm ci || npm install || true
+  npm install --no-save @commitlint/config-conventional @commitlint/cli || true
+  ./scripts/install-commit-msg-hook.sh || true
+else
+  echo "npm not found. Skipping commitlint installation and hook creation. Install Node/npm to enable commit message checks." >&2
+fi
+
 echo "Done. To verify, run: ~/.local/bin/pre-commit run --all-files" 

@@ -8,11 +8,14 @@ on:
 
 jobs:
   commitlint:
-    name: Commit message lint
+    if: github.event_name == 'pull_request'
+    name: Commit message lint (fail on bad messages)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Node
+        with:
+          fetch-depth: 0
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -20,13 +23,10 @@ jobs:
         run: |
           npm ci || npm install
           npm install --no-save @commitlint/config-conventional @commitlint/cli
-      - name: Get commits
+      - name: Run commitlint on PR commits
         run: |
-          echo "$(git log --format=%B -n 1 ${{ github.event.pull_request.head.sha }})" > /tmp/last_commit_msg.txt || true
-          cat /tmp/last_commit_msg.txt
-      - name: Lint commit message
-        run: |
-          npx commitlint --verbose --from=${{ github.event.pull_request.base.sha }} --to=${{ github.event.pull_request.head.sha }} || npx commitlint --verbose --edit /tmp/last_commit_msg.txt
+          echo "Running commitlint from ${{ github.event.pull_request.base.sha }} to ${{ github.event.pull_request.head.sha }}"
+          npx --no-install commitlint --from=${{ github.event.pull_request.base.sha }} --to=${{ github.event.pull_request.head.sha }}
 
   backend-check:
     name: Backend checks (Gradle)
