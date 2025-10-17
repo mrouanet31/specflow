@@ -163,7 +163,10 @@ def worker_task(args, row, index, results, lock):
             milestone_number = ensure_milestone(session, repo, args.milestone)
 
         # parse assignees (comma-separated)
-        assignees_list = [a.strip() for a in assignee.split(',') if a.strip()]
+        if getattr(args, 'skip_assignees', False):
+            assignees_list = []
+        else:
+            assignees_list = [a.strip() for a in assignee.split(',') if a.strip()]
 
         if args.dry_run:
             if verbose:
@@ -232,6 +235,7 @@ def main():
     parser.add_argument('--label-estimate', action='store_true', help='Create a label for the estimate (e.g. estimate:5)')
     parser.add_argument('--verbose', action='store_true', help='Verbose logging')
     parser.add_argument('--concurrency', type=int, default=1, help='Number of concurrent workers (default 1)')
+    parser.add_argument('--skip-assignees', action='store_true', help='Do not set assignees from CSV')
     parser.add_argument('--output-file', type=str, default='import-results.csv', help='CSV output file for results')
     args = parser.parse_args()
 
@@ -287,3 +291,6 @@ def main():
             writer.writerow(r)
 
     print(f'Done. Results written to {out_path}')
+
+if __name__ == '__main__':
+    main()

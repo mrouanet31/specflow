@@ -22,19 +22,28 @@ CSV_PATH="$2"
 shift 2
 EXTRA_ARGS="$@"
 
-if [ -z "${GITHUB_TOKEN:-}" ]; then
+# Allow running dry-run without a token (useful for local testing).
+# If GITHUB_TOKEN is unset and the user did not request --dry-run, fail.
+if [ -z "${GITHUB_TOKEN:-}" ] && [[ "${EXTRA_ARGS}" != *"--dry-run"* ]]; then
   echo "GITHUB_TOKEN not set. Please export your token (do NOT commit it)."
   exit 2
 fi
 
 echo "Running dry-run..."
-python3 "$IMPORTER" --dry-run "$REPO" "$CSV_PATH" $EXTRA_ARGS
+# Prefer .venv_ci Python if available
+if [ -x "./.venv_ci/bin/python" ]; then
+  PYEXEC="./.venv_ci/bin/python"
+else
+  PYEXEC="python3"
+fi
+
+"$PYEXEC" "$IMPORTER" --dry-run "$REPO" "$CSV_PATH" $EXTRA_ARGS
 
 read -p "Dry-run complete. Proceed with real import? [y/N] " answer
 case "$answer" in
   y|Y)
     echo "Running real import..."
-    python3 "$IMPORTER" "$REPO" "$CSV_PATH" $EXTRA_ARGS
+    "$PYEXEC" "$IMPORTER" "$REPO" "$CSV_PATH" $EXTRA_ARGS
     ;;
   *)
     echo "Aborted by user. No changes made."
