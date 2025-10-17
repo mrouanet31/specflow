@@ -19,14 +19,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-      - name: Install commitlint
+      - name: Install commitlint in temp workspace
         run: |
-          npm ci || npm install
-          npm install --no-save @commitlint/config-conventional @commitlint/cli
+          set -euo pipefail
+          TMPDIR="$(pwd)/.commitlint_tmp"
+          mkdir -p "$TMPDIR"
+          pushd "$TMPDIR"
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-save @commitlint/config-conventional @commitlint/cli >/dev/null
+          popd
       - name: Run commitlint on PR commits
+        env:
+          PATH: "${{ runner.tool_cache }}/node/18.*/x64/bin:${{ github.workspace }}/.commitlint_tmp/node_modules/.bin:${{ env.PATH }}"
         run: |
           echo "Running commitlint from ${{ github.event.pull_request.base.sha }} to ${{ github.event.pull_request.head.sha }}"
-          npx --no-install commitlint --from=${{ github.event.pull_request.base.sha }} --to=${{ github.event.pull_request.head.sha }}
+          ./.commitlint_tmp/node_modules/.bin/commitlint --from=${{ github.event.pull_request.base.sha }} --to=${{ github.event.pull_request.head.sha }}
 
   backend-check:
     name: Backend checks (Gradle)
