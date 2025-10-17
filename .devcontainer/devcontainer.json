@@ -1,0 +1,50 @@
+{
+    "name": "SpecFlow - Dev Container",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": "."
+    },
+    "workspaceFolder": "/workspaces/specflow",
+    "remoteUser": "vscode",
+    "forwardPorts": [
+        3000,
+        4200,
+        8080,
+        5432,
+        9200,
+        15672
+    ],
+    "features": {
+        // Java will be installed inside the running container (post-create) to avoid build-time network issues
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "20",
+            "pnpmVersion": "latest",
+            "nodeGypDependencies": true
+        },
+        "ghcr.io/devcontainers/features/docker-outside-of-docker:": {}
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "vscjava.vscode-java-pack",
+                "ms-azuretools.vscode-docker",
+                "ms-kubernetes-tools.vscode-kubernetes-tools",
+                "esbenp.prettier-vscode",
+                "dbaeumer.vscode-eslint",
+                "bungcip.better-toml",
+                "eamodio.gitlens",
+                "Angular.ng-template",
+                "nrwl.angular-console",
+                "bradlc.vscode-tailwindcss",
+                "redhat.vscode-xml"
+            ],
+            "settings": {
+                "editor.formatOnSave": true,
+                "editor.defaultFormatter": "esbenp.prettier-vscode",
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "java.configuration.runtimes": [],
+                "maven.executable.path": "mvn"
+            }
+        }
+    }
+}
