@@ -1,5 +1,9 @@
 name: Commitlint feedback
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   workflow_run:
     workflows: ["Quality checks"]
@@ -63,12 +67,18 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const fs = require('fs');
-            const run = context.payload.workflow_run;
+            // Read the event payload directly from the event file to avoid relying on context.payload
+            const eventPath = process.env.GITHUB_EVENT_PATH;
+            if (!eventPath || !fs.existsSync(eventPath)) return;
+            const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+            const run = payload.workflow_run;
             if (!run) return;
             const prs = run.pull_requests || [];
             if (!prs || prs.length === 0) return;
             const prNumber = prs[0].number;
             const output = fs.readFileSync('commitlint_output.txt', 'utf8').slice(0, 4000);
+            const fromSha = run.base_sha || '';
+            const toSha = run.head_sha || '';
             const bodyLines = [
               'Hello! The commit message checks failed on this PR.',
               '',
@@ -79,7 +89,7 @@ jobs:
               '',
               'You can reproduce locally by running:',
               './scripts/setup-dev.sh',
-              `./.commitlint_tmp/node_modules/.bin/commitlint --from=${run.base_sha} --to=${run.head_sha}`,
+              `./.commitlint_tmp/node_modules/.bin/commitlint --from=${fromSha} --to=${toSha}`,
               '',
               'See CONTRIBUTING.md for the required format.'
             ];
