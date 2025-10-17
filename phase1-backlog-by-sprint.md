@@ -13,8 +13,16 @@ Notation estimations : Fibonacci (1,2,3,5,8,13). Owner recommandé = role type (
    - Owner: DevOps, Backend, Frontend
    - Description: Créer la structure Nx (ou monorepo équivalent) avec modules `frontend/`, `backend/`, `infra/`.
    - Acceptance:
-     - Repo créé avec README, license, .gitignore
-     - CI minimal (build) passe
+    - Status: Done
+    - Delivered:
+       - Repo scaffold (frontend/, backend/, infra/) added
+       - README, LICENSE, .gitignore added
+       - CI workflow (build frontend, backend, python tests) added and adjusted to use Gradle for backend
+       - Frontend scaffold: Angular 20 app added (buildable)
+       - Backend scaffold: Spring Boot (Gradle) app added with /health endpoint and tests
+       - Feature branch `feature/INIT-001-initialize-monorepo` created and PR merged into `main` (see recent commits)
+    - Acceptance:
+       - Repo scaffold present and CI builds (see commit history)
    - Dépendances: aucune
 
 2. INIT-002 — Templates PR & Issue
