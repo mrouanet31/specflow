@@ -1,0 +1,9 @@
+{
+  "name": "specflow-frontend-placeholder",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "echo \"Frontend build placeholder\"",
+    "start": "echo \"Start frontend placeholder\""
+  }
+}
