@@ -82,12 +82,33 @@ jobs:
             echo "COMMENT_TOKEN=${GITHUB_TOKEN}" >> $GITHUB_ENV
           fi
 
+      - name: Debug which token is used
+        run: |
+          # Print which token source is selected (do not print the token itself)
+          if grep -q '^COMMENT_TOKEN=' $GITHUB_ENV; then
+            # Determine whether COMMENT_TOKEN matches the PAT secret (length heuristic) or the GITHUB_TOKEN pattern
+            VAL=$(grep '^COMMENT_TOKEN=' $GITHUB_ENV | cut -d'=' -f2-)
+            LEN=${#VAL}
+            if [ "$LEN" -gt 40 ]; then
+              echo "Using COMMIT_COMMENT_TOKEN (likely PAT)"
+            else
+              echo "Using GITHUB_TOKEN or short token"
+            fi
+          else
+            echo "No COMMENT_TOKEN set"
+          fi
+
       - name: Post PR comment with commitlint output
         uses: actions/github-script@v6
+        env:
+          COMMENT_TOKEN: ${{ env.COMMENT_TOKEN }}
         with:
-          github-token: ${{ env.COMMENT_TOKEN }}
           script: |
             const fs = require('fs');
+            const { Octokit } = require('octokit');
+            const token = process.env.COMMENT_TOKEN;
+            if (!token) return;
+            const octokit = new Octokit({ auth: token });
             // Read the event payload directly from the event file to avoid relying on context.payload
             const eventPath = process.env.GITHUB_EVENT_PATH;
             if (!eventPath || !fs.existsSync(eventPath)) return;
@@ -115,7 +136,7 @@ jobs:
               'See CONTRIBUTING.md for the required format.'
             ];
             const body = bodyLines.join('\n');
-            await github.rest.issues.createComment({
+            await octokit.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
