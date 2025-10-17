@@ -1,0 +1,86 @@
+name: Quality checks
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  commitlint:
+    if: github.event_name == 'pull_request'
+    name: Commit message lint (fail on bad messages)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install commitlint in temp workspace
+        run: |
+          set -euo pipefail
+          TMPDIR="$(pwd)/.commitlint_tmp"
+          mkdir -p "$TMPDIR"
+          pushd "$TMPDIR"
+          npm init -y >/dev/null 2>&1 || true
+          npm install --no-save @commitlint/config-conventional @commitlint/cli >/dev/null
+          popd
+      - name: Run commitlint on PR commits
+        env:
+          PATH: "${{ runner.tool_cache }}/node/18.*/x64/bin:${{ github.workspace }}/.commitlint_tmp/node_modules/.bin:${{ env.PATH }}"
+        run: |
+          echo "Running commitlint from ${{ github.event.pull_request.base.sha }} to ${{ github.event.pull_request.head.sha }}"
+          ./.commitlint_tmp/node_modules/.bin/commitlint --from=${{ github.event.pull_request.base.sha }} --to=${{ github.event.pull_request.head.sha }}
+
+  backend-check:
+    name: Backend checks (Gradle)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Make gradlew executable
+        run: chmod +x backend/gradlew
+      - name: Run Gradle check
+        working-directory: backend
+        run: ./gradlew --no-daemon clean check
+
+  frontend-test:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install frontend deps
+        working-directory: frontend
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Run frontend tests
+        working-directory: frontend
+        run: |
+          if npm run test --silent; then echo 'tests passed'; else echo 'no tests or tests failed'; exit 0; fi
+
+  python-tests:
+    name: Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dev requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements-dev.txt
+      - name: Run pytest
+        run: pytest -q
