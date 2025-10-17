@@ -13,110 +13,101 @@ jobs:
   comment:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
-    env:
-      NODE_VERSION: "18"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Cache commitlint node_modules
-        uses: actions/cache@v4
-        with:
-          path: ./.commitlint_tmp/node_modules
-          key: commitlint-${{ runner.os }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('commitlint.config.js') }}
-          restore-keys: |
-            commitlint-${{ runner.os }}-node-
-
       - name: Install commitlint temporarily
         run: |
-          TMPDIR="$(pwd)/.commitlint_tmp"
-          mkdir -p "$TMPDIR"
-          pushd "$TMPDIR"
-          npm init -y >/dev/null 2>&1 || true
-          # Install only if node_modules is missing or incomplete; cache will speed this up on hits
-          npm install --no-save @commitlint/config-conventional @commitlint/cli >/dev/null 2>&1 || true
-          popd
+          name: Commitlint feedback
 
-      - name: Run commitlint and save output
-        env:
-          GITHUB_EVENT_PATH: ${{ github.event_path }}
-        run: |
-          set -euo pipefail
-          BIN="./.commitlint_tmp/node_modules/.bin/commitlint"
-          # Allow Node to load modules from the temporary install
-          export NODE_PATH="./.commitlint_tmp/node_modules"
-          PAYLOAD=$(cat "$GITHUB_EVENT_PATH")
-          PR_NUMBER=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].number // empty')
-          FROM=$(echo "$PAYLOAD" | jq -r '.workflow_run.base_sha')
-          TO=$(echo "$PAYLOAD" | jq -r '.workflow_run.head_sha')
-            # If FROM is still empty or looks invalid, try to compute a merge-base between
-            # the PR head and its base ref by fetching the PR head and base refs and running git merge-base.
-            if [ -n "$PR_NUMBER" ]; then
-              BASE_REF=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].base.ref // empty')
-              HEAD_REF="refs/pull/${PR_NUMBER}/head"
-              # Try to fetch the PR head and base branch refs; ignore errors
-              git fetch origin +"${HEAD_REF}":refs/remotes/origin/pr/${PR_NUMBER} >/dev/null 2>&1 || true
-              if [ -n "$BASE_REF" ]; then
-                git fetch origin "refs/heads/${BASE_REF}":refs/remotes/origin/${BASE_REF} >/dev/null 2>&1 || true
-              fi
-              # Compute merge-base if possible
-              if [ -n "$BASE_REF" ]; then
-                MERGE_BASE=$(git merge-base refs/remotes/origin/${BASE_REF} refs/remotes/origin/pr/${PR_NUMBER} 2>/dev/null || true)
-              else
-                MERGE_BASE=$(git merge-base origin/${TO} refs/remotes/origin/pr/${PR_NUMBER} 2>/dev/null || true)
-              fi
-              if [ -n "$MERGE_BASE" ] && [ "$MERGE_BASE" != "" ]; then
-                FROM=$MERGE_BASE
-              fi
-            fi
-          echo "PR=$PR_NUMBER FROM=$FROM TO=$TO" > commitlint_output.txt
-          if [ -n "$PR_NUMBER" ] && [ -x "$BIN" ]; then
-            "$BIN" --from="$FROM" --to="$TO" 2>&1 | sed -n '1,4000p' >> commitlint_output.txt || true
-          else
-            echo "commitlint binary not found or no PR" >> commitlint_output.txt
-          fi
+          permissions:
+            contents: read
+            issues: write
 
-      - name: Post PR comment with commitlint output
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            // Read the event payload directly from the event file to avoid relying on context.payload
-            const eventPath = process.env.GITHUB_EVENT_PATH;
-            if (!eventPath || !fs.existsSync(eventPath)) return;
-            const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
-            const run = payload.workflow_run;
-            if (!run) return;
-            const prs = run.pull_requests || [];
-            if (!prs || prs.length === 0) return;
-            const prNumber = prs[0].number;
-            const output = fs.readFileSync('commitlint_output.txt', 'utf8').slice(0, 4000);
-            const fromSha = run.base_sha || '';
-            const toSha = run.head_sha || '';
-            const bodyLines = [
-              'Hello! The commit message checks failed on this PR.',
-              '',
-              'commitlint output (truncated):',
-              '```',
-              output,
-              '```',
-              '',
-              'You can reproduce locally by running:',
-              './scripts/setup-dev.sh',
-              `./.commitlint_tmp/node_modules/.bin/commitlint --from=${fromSha} --to=${toSha}`,
-              '',
-              'See CONTRIBUTING.md for the required format.'
-            ];
-            const body = bodyLines.join('\n');
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-              body,
-            });
+          on:
+            workflow_run:
+              workflows: ["Quality checks"]
+              types: [completed]
+
+          jobs:
+            comment:
+              if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+              runs-on: ubuntu-latest
+              steps:
+                - name: Checkout
+                  uses: actions/checkout@v4
+
+                - name: Setup Node
+                  uses: actions/setup-node@v4
+                  with:
+                    node-version: '18'
+
+                - name: Install commitlint temporarily
+                  run: |
+                    TMPDIR="$(pwd)/.commitlint_tmp"
+                    mkdir -p "$TMPDIR"
+                    pushd "$TMPDIR"
+                    npm init -y >/dev/null 2>&1 || true
+                    npm install --no-save @commitlint/config-conventional @commitlint/cli >/dev/null 2>&1 || true
+                    popd
+
+                - name: Run commitlint and save output
+                  env:
+                    GITHUB_EVENT_PATH: ${{ github.event_path }}
+                  run: |
+                    set -euo pipefail
+                    BIN="./.commitlint_tmp/node_modules/.bin/commitlint"
+                    export NODE_PATH="./.commitlint_tmp/node_modules"
+                    PAYLOAD=$(cat "$GITHUB_EVENT_PATH")
+                    PR_NUMBER=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].number // empty')
+                    FROM=$(echo "$PAYLOAD" | jq -r '.workflow_run.base_sha // empty')
+                    TO=$(echo "$PAYLOAD" | jq -r '.workflow_run.head_sha // empty')
+                    if [ -z "$FROM" ] && [ -n "$PR_NUMBER" ]; then
+                      FROM=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].base.sha // empty')
+                    fi
+                    if [ -z "$TO" ] && [ -n "$PR_NUMBER" ]; then
+                      TO=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].head.sha // empty')
+                    fi
+                    if [ -n "$PR_NUMBER" ]; then
+                      BASE_REF=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].base.ref // empty')
+                      git fetch origin +"refs/pull/${PR_NUMBER}/head":refs/remotes/origin/pr/${PR_NUMBER} >/dev/null 2>&1 || true
+                      if [ -n "$BASE_REF" ]; then
+                        git fetch origin "refs/heads/${BASE_REF}":refs/remotes/origin/${BASE_REF} >/dev/null 2>&1 || true
+                        MERGE_BASE=$(git merge-base refs/remotes/origin/${BASE_REF} refs/remotes/origin/pr/${PR_NUMBER} 2>/dev/null || true)
+                      else
+                        MERGE_BASE=$(git merge-base origin/${TO} refs/remotes/origin/pr/${PR_NUMBER} 2>/dev/null || true)
+                      fi
+                      if [ -n "$MERGE_BASE" ] && [ "$MERGE_BASE" != "" ]; then
+                        FROM=$MERGE_BASE
+                      fi
+                    fi
+                    echo "PR=$PR_NUMBER FROM=$FROM TO=$TO" > commitlint_output.txt
+                    if [ -n "$PR_NUMBER" ] && [ -x "$BIN" ] && [ -n "$FROM" ] && [ -n "$TO" ]; then
+                      "$BIN" --from="$FROM" --to="$TO" 2>&1 | sed -n '1,4000p' >> commitlint_output.txt || true
+                    else
+                      echo "Skipping commitlint: PR=$PR_NUMBER FROM=$FROM TO=$TO" > commitlint_output.txt
+                    fi
+
+                - name: Post PR comment with commitlint output
+                  uses: actions/github-script@v6
+                  env:
+                    COMMENT_TOKEN: ${{ secrets.COMMIT_COMMENT_TOKEN }}
+                  with:
+                    script: |
+                      const fs = require('fs');
+                      const { Octokit } = require('octokit');
+                      const token = process.env.COMMENT_TOKEN || process.env.GITHUB_TOKEN || '';
+                      if (!token) return;
+                      const octokit = new Octokit({ auth: token });
+                      const eventPath = process.env.GITHUB_EVENT_PATH;
+                      if (!eventPath || !fs.existsSync(eventPath)) return;
+                      const payload = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+                      const run = payload.workflow_run;
+                      if (!run) return;
+                      const prs = run.pull_requests || [];
+                      if (!prs || prs.length === 0) return;
+                      const prNumber = prs[0].number;
+                      const output = fs.readFileSync('commitlint_output.txt', 'utf8').slice(0,4000);
+                      const body = ['Hello! The commit message checks failed on this PR.','', 'commitlint output (truncated):','```', output, '```','', 'See CONTRIBUTING.md for the required format.'].join('\n');
+                      await octokit.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: prNumber, body });
