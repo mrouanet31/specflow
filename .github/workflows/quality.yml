@@ -39,6 +39,8 @@ jobs:
           set -euo pipefail
           # Make commitlint from the temporary install available while keeping system PATH
           export PATH="$GITHUB_WORKSPACE/.commitlint_tmp/node_modules/.bin:$PATH"
+          # Ensure Node can resolve modules installed in the temporary directory
+          export NODE_PATH="$GITHUB_WORKSPACE/.commitlint_tmp/node_modules"
           echo "Listing commits in the PR"
           # Get the list of commits between base and head (ordered oldest->newest)
           commits=$(git rev-list --reverse ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}) || true
