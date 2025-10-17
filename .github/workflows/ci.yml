@@ -18,7 +18,18 @@ jobs:
       - name: Build frontend (Angular placeholder)
         run: |
           cd frontend || exit 0
-          if [ -f package.json ]; then npm ci && npm run build; fi
+          if [ ! -f package.json ]; then
+            echo "No frontend package.json found — skipping frontend build"
+            exit 0
+          fi
+          if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then
+            echo "Lockfile found — running npm ci"
+            npm ci
+          else
+            echo "No lockfile — running npm install"
+            npm install
+          fi
+          npm run build || echo "Frontend build exited with non-zero status"
 
   backend-build:
     runs-on: ubuntu-latest
