@@ -1,3 +1,6 @@
+Specflow frontend placeholder
+
+This folder contains a minimal placeholder frontend to satisfy CI until a real Angular app is added.
 # Frontend (placeholder)
 
 Ce dossier contient le code frontend. Pour l'instant c'est un placeholder minimal pour initialiser la structure du monorepo.

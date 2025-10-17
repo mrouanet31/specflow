@@ -1,4 +1,15 @@
 {
+  "name": "specflow-frontend",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "echo \"Building placeholder Angular app...\" && mkdir -p dist && echo '<h1>Specflow frontend placeholder</h1>' > dist/index.html",
+    "test": "echo \"No tests configured\" && exit 0"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
+{
   "name": "specflow-frontend-placeholder",
   "version": "0.0.1",
   "private": true,
