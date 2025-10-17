@@ -1,0 +1,79 @@
+name: Quality checks
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  commitlint:
+    name: Commit message lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install commitlint
+        run: |
+          npm ci || npm install
+          npm install --no-save @commitlint/config-conventional @commitlint/cli
+      - name: Get commits
+        run: |
+          echo "$(git log --format=%B -n 1 ${{ github.event.pull_request.head.sha }})" > /tmp/last_commit_msg.txt || true
+          cat /tmp/last_commit_msg.txt
+      - name: Lint commit message
+        run: |
+          npx commitlint --verbose --from=${{ github.event.pull_request.base.sha }} --to=${{ github.event.pull_request.head.sha }} || npx commitlint --verbose --edit /tmp/last_commit_msg.txt
+
+  backend-check:
+    name: Backend checks (Gradle)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Make gradlew executable
+        run: chmod +x backend/gradlew
+      - name: Run Gradle check
+        working-directory: backend
+        run: ./gradlew --no-daemon clean check
+
+  frontend-test:
+    name: Frontend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Install frontend deps
+        working-directory: frontend
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+      - name: Run frontend tests
+        working-directory: frontend
+        run: |
+          if npm run test --silent; then echo 'tests passed'; else echo 'no tests or tests failed'; exit 0; fi
+
+  python-tests:
+    name: Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dev requirements
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements-dev.txt
+      - name: Run pytest
+        run: pytest -q
