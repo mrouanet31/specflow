@@ -2,9 +2,9 @@ name: Quality checks
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   commitlint:
@@ -18,7 +18,13 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
+      - name: Restore commitlint cache
+        uses: actions/cache@v4
+        with:
+          path: ./.commitlint_tmp/node_modules
+          key: commitlint-${{ runner.os }}-node-18-${{ hashFiles('commitlint.config.js') }}
+
       - name: Install commitlint in temp workspace
         run: |
           set -euo pipefail
@@ -32,8 +38,32 @@ jobs:
         env:
           PATH: "${{ runner.tool_cache }}/node/18.*/x64/bin:${{ github.workspace }}/.commitlint_tmp/node_modules/.bin:${{ env.PATH }}"
         run: |
-          echo "Running commitlint from ${{ github.event.pull_request.base.sha }} to ${{ github.event.pull_request.head.sha }}"
-          ./.commitlint_tmp/node_modules/.bin/commitlint --from=${{ github.event.pull_request.base.sha }} --to=${{ github.event.pull_request.head.sha }}
+          set -euo pipefail
+          echo "Listing commits in the PR"
+          # Get the list of commits between base and head (ordered oldest->newest)
+          commits=$(git rev-list --reverse ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}) || true
+          if [ -z "$commits" ]; then
+            echo "No commits found in PR range; trying to list PR commits via API"
+            commits=$(gh pr view --repo ${{ github.repository }} ${{ github.event.pull_request.number }} --json commits --jq '.commits[].oid')
+          fi
+          echo "Found commits:"
+          echo "$commits"
+          failed=0
+          for sha in $commits; do
+            echo "Checking commit $sha"
+            # Extract commit message subject and body
+            git show --no-patch --format=%B $sha > /tmp/commitmsg.txt
+            if ./.commitlint_tmp/node_modules/.bin/commitlint --config commitlint.config.js --verbose < /tmp/commitmsg.txt; then
+              echo "commit $sha OK"
+            else
+              echo "commit $sha FAILED"
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "One or more commit messages failed commitlint"
+            exit 1
+          fi
 
   backend-check:
     name: Backend checks (Gradle)
@@ -44,7 +74,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
       - name: Make gradlew executable
         run: chmod +x backend/gradlew
       - name: Run Gradle check
@@ -59,7 +89,7 @@ jobs:
       - name: Use Node.js 18
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: "18"
       - name: Install frontend deps
         working-directory: frontend
         run: |
@@ -77,7 +107,7 @@ jobs:
       - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
       - name: Install dev requirements
         run: |
           python -m pip install --upgrade pip
