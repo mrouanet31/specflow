@@ -52,19 +52,40 @@ jobs:
           export NODE_PATH="./.commitlint_tmp/node_modules"
           PAYLOAD=$(cat "$GITHUB_EVENT_PATH")
           PR_NUMBER=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].number // empty')
-          FROM=$(echo "$PAYLOAD" | jq -r '.workflow_run.base_sha')
-          TO=$(echo "$PAYLOAD" | jq -r '.workflow_run.head_sha')
+          # Try several fallbacks for FROM/TO so we don't run commitlint with null shas
+          FROM=$(echo "$PAYLOAD" | jq -r '.workflow_run.base_sha // empty')
+          TO=$(echo "$PAYLOAD" | jq -r '.workflow_run.head_sha // empty')
+          if [ -z "$FROM" ] && [ -n "$PR_NUMBER" ]; then
+            # Try to read the PR base sha from the pull_requests object
+            FROM=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].base.sha // empty')
+          fi
+          if [ -z "$TO" ] && [ -n "$PR_NUMBER" ]; then
+            TO=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].head.sha // empty')
+          fi
           echo "PR=$PR_NUMBER FROM=$FROM TO=$TO" > commitlint_output.txt
-          if [ -n "$PR_NUMBER" ] && [ -x "$BIN" ]; then
+          if [ -n "$PR_NUMBER" ] && [ -x "$BIN" ] && [ -n "$FROM" ] && [ -n "$TO" ]; then
+            echo "Running commitlint --from=$FROM --to=$TO" >> commitlint_output.txt
             "$BIN" --from="$FROM" --to="$TO" 2>&1 | sed -n '1,4000p' >> commitlint_output.txt || true
           else
-            echo "commitlint binary not found or no PR" >> commitlint_output.txt
+            echo "Skipping commitlint run: binary present=$([ -x \"$BIN\" ] && echo yes || echo no), PR_number=$PR_NUMBER, FROM=$FROM, TO=$TO" >> commitlint_output.txt
+          fi
+
+      - name: Set comment token
+        env:
+          COMMIT_COMMENT_TOKEN: ${{ secrets.COMMIT_COMMENT_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Prefer a user-provided PAT in COMMIT_COMMENT_TOKEN when available.
+          if [ -n "${COMMIT_COMMENT_TOKEN:-}" ]; then
+            echo "COMMENT_TOKEN=${COMMIT_COMMENT_TOKEN}" >> $GITHUB_ENV
+          else
+            echo "COMMENT_TOKEN=${GITHUB_TOKEN}" >> $GITHUB_ENV
           fi
 
       - name: Post PR comment with commitlint output
         uses: actions/github-script@v6
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ env.COMMENT_TOKEN }}
           script: |
             const fs = require('fs');
             // Read the event payload directly from the event file to avoid relying on context.payload
