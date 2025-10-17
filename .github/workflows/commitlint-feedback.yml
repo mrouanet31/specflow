@@ -142,4 +142,3 @@ jobs:
               issue_number: prNumber,
               body,
             });
-                      await octokit.rest.issues.createComment({
