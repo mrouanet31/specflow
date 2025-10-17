@@ -54,6 +54,26 @@ jobs:
           PR_NUMBER=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].number // empty')
           FROM=$(echo "$PAYLOAD" | jq -r '.workflow_run.base_sha')
           TO=$(echo "$PAYLOAD" | jq -r '.workflow_run.head_sha')
+            # If FROM is still empty or looks invalid, try to compute a merge-base between
+            # the PR head and its base ref by fetching the PR head and base refs and running git merge-base.
+            if [ -n "$PR_NUMBER" ]; then
+              BASE_REF=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].base.ref // empty')
+              HEAD_REF="refs/pull/${PR_NUMBER}/head"
+              # Try to fetch the PR head and base branch refs; ignore errors
+              git fetch origin +"${HEAD_REF}":refs/remotes/origin/pr/${PR_NUMBER} >/dev/null 2>&1 || true
+              if [ -n "$BASE_REF" ]; then
+                git fetch origin "refs/heads/${BASE_REF}":refs/remotes/origin/${BASE_REF} >/dev/null 2>&1 || true
+              fi
+              # Compute merge-base if possible
+              if [ -n "$BASE_REF" ]; then
+                MERGE_BASE=$(git merge-base refs/remotes/origin/${BASE_REF} refs/remotes/origin/pr/${PR_NUMBER} 2>/dev/null || true)
+              else
+                MERGE_BASE=$(git merge-base origin/${TO} refs/remotes/origin/pr/${PR_NUMBER} 2>/dev/null || true)
+              fi
+              if [ -n "$MERGE_BASE" ] && [ "$MERGE_BASE" != "" ]; then
+                FROM=$MERGE_BASE
+              fi
+            fi
           echo "PR=$PR_NUMBER FROM=$FROM TO=$TO" > commitlint_output.txt
           if [ -n "$PR_NUMBER" ] && [ -x "$BIN" ]; then
             "$BIN" --from="$FROM" --to="$TO" 2>&1 | sed -n '1,4000p' >> commitlint_output.txt || true
