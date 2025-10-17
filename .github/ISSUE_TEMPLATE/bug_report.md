@@ -3,7 +3,7 @@ name: Bug report
 about: Déclarez un bug afin que l'équipe puisse le reproduire et le corriger
 title: "[BUG] "
 labels: bug
-assignees: ''
+assignees: ""
 ---
 
 ## Résumé
@@ -11,9 +11,10 @@ assignees: ''
 Une phrase courte décrivant le bug.
 
 ## Étapes pour reproduire
-1. 
-2. 
-3. 
+
+1.
+2.
+3.
 
 ## Comportement attendu
 
@@ -25,9 +26,9 @@ Ce qui se produit réellement (logs, screenshots...).
 
 ## Environnement
 
-- Version du projet / commit: 
-- OS / version: 
-- Browser / runtime: 
+- Version du projet / commit:
+- OS / version:
+- Browser / runtime:
 
 ## Logs / Stacktrace
 

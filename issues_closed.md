@@ -1,5 +1,4 @@
-Closed Issues Log
-=================
+# Closed Issues Log
 
 - INIT-001: Initialiser monorepo
   - Status: Closed
