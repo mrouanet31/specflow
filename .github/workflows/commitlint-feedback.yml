@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -37,9 +39,10 @@ jobs:
           TMPDIR="$(pwd)/.commitlint_tmp"
           mkdir -p "$TMPDIR"
           pushd "$TMPDIR"
-          npm init -y >/dev/null 2>&1 || true
+          npm init -y || true
           # Install only if node_modules is missing or incomplete; cache will speed this up on hits
-          npm install --no-save @commitlint/config-conventional @commitlint/cli >/dev/null 2>&1 || true
+          # Do not silence npm install errors so failures are visible and fail the job when relevant
+          npm install --no-save @commitlint/config-conventional @commitlint/cli
           popd
 
       - name: Run commitlint and save output
@@ -61,6 +64,13 @@ jobs:
           fi
           if [ -z "$TO" ] && [ -n "$PR_NUMBER" ]; then
             TO=$(echo "$PAYLOAD" | jq -r '.workflow_run.pull_requests[0].head.sha // empty')
+          fi
+          # If FROM is still empty but TO is present, try a merge-base fallback
+          if [ -z "$FROM" ] && [ -n "$TO" ]; then
+            # Ensure we have refs to compute merge-base
+            git fetch origin --no-tags --prune --depth=1 || git fetch origin --no-tags || true
+            # Attempt to compute merge-base against origin/main (fallback) — adjust if your default branch differs
+            FROM=$(git merge-base origin/main "$TO" || true)
           fi
           echo "PR=$PR_NUMBER FROM=$FROM TO=$TO" > commitlint_output.txt
           if [ -n "$PR_NUMBER" ] && [ -x "$BIN" ] && [ -n "$FROM" ] && [ -n "$TO" ]; then
@@ -105,10 +115,10 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const { Octokit } = require('octokit');
             const token = process.env.COMMENT_TOKEN;
             if (!token) return;
-            const octokit = new Octokit({ auth: token });
+            // Use the github client provided by actions/github-script to ensure correct auth/context
+            const octokit = github.getOctokit(token);
             // Read the event payload directly from the event file to avoid relying on context.payload
             const eventPath = process.env.GITHUB_EVENT_PATH;
             if (!eventPath || !fs.existsSync(eventPath)) return;
