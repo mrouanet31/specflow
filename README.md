@@ -33,3 +33,17 @@ The GitHub Actions CI runs a minimal build for both frontend and backend. The fu
 
 Onboarding notes
 - The feature branch `feature/INIT-001-initialize-monorepo` contains the initial scaffolding. Open a PR with `INIT-001-plan.md` in the description to start the review.
+
+## Running with Docker Compose (INIT-004)
+
+We provide a minimal Docker Compose setup to run backend, frontend and Postgres locally for development and lightweight staging.
+
+Make targets:
+
+- `make compose-up` — builds and starts services in background
+- `make compose-down` — stops and removes containers and volumes
+- `make smoke-test` — runs a small script that verifies `/health` endpoints for backend and frontend
+
+Notes:
+
+- This is an MVP flow intended to be fast to iterate. Kubernetes artifacts are tracked separately in the INIT-004 plan and will be prepared as Helm skeletons for future migration.
